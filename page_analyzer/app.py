@@ -78,7 +78,16 @@ def url_detail(id):
 	url = cur.fetchone()
 	if not url:
 		flash('URL не найден', 'alert alert-danger')
+		cur.close()
+		conn.close()
 		return redirect(url_for('urls_list'))
+	cur.execute("""
+	       SELECT id, created_at
+	       FROM url_checks
+	       WHERE url_id = %s
+	       ORDER BY id DESC
+	   """, (id,))
+	checks = cur.fetchall()
 	cur.close()
 	conn.close()
 	return render_template(
@@ -86,5 +95,21 @@ def url_detail(id):
 		url_id=url['id'],
 		url_name=url['name'],
 		url_created_at=url['created_at'],
+		checks=checks,
 		id=id
 	)
+
+
+@app.route('/urls/<id>/checks', methods=['POST'])
+def url_checks(id):
+	conn = connect_db()
+	cur = conn.cursor(cursor_factory=RealDictCursor)
+	cur.execute(
+		"INSERT INTO url_checks (url_id, created_at) VALUES (%s, %s) RETURNING id;",
+		(id, datetime.now())
+	)
+	conn.commit()
+	cur.close()
+	conn.close()
+	flash("Страница успешно проверена", "alert alert-success")
+	return redirect(url_for('url_detail', id=id))
