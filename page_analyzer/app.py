@@ -1,5 +1,6 @@
 import os
 import psycopg2
+import requests
 import validators
 from psycopg2.extras import RealDictCursor
 from urllib.parse import urlparse
@@ -63,7 +64,20 @@ def add_url():
 def urls_list():
 	conn = connect_db()
 	cur = conn.cursor()
-	cur.execute("SELECT * FROM urls ORDER BY id DESC")
+	cur.execute("""
+	                SELECT urls.id,
+	                       urls.name,
+	                       url_checks.created_at AS last_check,
+	                       url_checks.status_code
+	                FROM urls
+	                LEFT JOIN (
+	                    SELECT DISTINCT ON (url_id) url_id, created_at, status_code
+	                    FROM url_checks
+	                    ORDER BY url_id, created_at DESC
+	                ) AS url_checks
+	                ON urls.id = url_checks.url_id
+	                ORDER BY urls.id DESC;
+	            """)
 	urls = cur.fetchall()
 	cur.close()
 	conn.close()
@@ -82,7 +96,7 @@ def url_detail(id):
 		conn.close()
 		return redirect(url_for('urls_list'))
 	cur.execute("""
-	       SELECT id, created_at
+	       SELECT id, status_code, created_at
 	       FROM url_checks
 	       WHERE url_id = %s
 	       ORDER BY id DESC
@@ -104,9 +118,16 @@ def url_detail(id):
 def url_checks(id):
 	conn = connect_db()
 	cur = conn.cursor(cursor_factory=RealDictCursor)
+	cur.execute("SELECT name FROM urls WHERE id = %s", (id,))
+	row = cur.fetchone()
+	try:
+		response = requests.get(row['name'])
+	except Exception:
+		flash("Произошла ошибка при проверке", "alert alert-danger")
+		return redirect(url_for('url_detail', id=id))
 	cur.execute(
-		"INSERT INTO url_checks (url_id, created_at) VALUES (%s, %s) RETURNING id;",
-		(id, datetime.now())
+		"INSERT INTO url_checks (url_id, status_code, created_at) VALUES (%s, %s, %s) RETURNING id;",
+		(id, response.status_code, datetime.now())
 	)
 	conn.commit()
 	cur.close()

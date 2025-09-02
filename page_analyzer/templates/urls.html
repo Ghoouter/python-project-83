@@ -16,14 +16,14 @@
       <tbody>
         {% for url in url_list %}
         <tr>
-          <td>{{ url['id'] }}</td>
+          <td>{{ url.id }}</td>
           <td>
             <a href="/urls/{{ url['id'] }}">
-              {{ url['name'] }}
+              {{ url.name }}
             </a>
           </td>
-          <td>{{ url['check_data'] }}</td>
-          <td>{{ url['response_code'] }}</td>
+          <td>{{ url.last_check.date() or '' }}</td>
+          <td>{{ url.status_code or '' }}</td>
         </tr>
         {% endfor %}
       </tbody>
