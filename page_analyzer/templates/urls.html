@@ -22,7 +22,7 @@
               {{ url.name }}
             </a>
           </td>
-          <td>{{ url.last_check.date() or '' }}</td>
+          <td>{{ url.last_check.date() if url.last_check else '' }}</td>
           <td>{{ url.status_code or '' }}</td>
         </tr>
         {% endfor %}

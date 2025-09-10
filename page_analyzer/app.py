@@ -6,7 +6,7 @@ import validators
 from psycopg2.extras import RealDictCursor
 from urllib.parse import urlparse
 from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import abort, Flask, render_template, request, redirect, url_for, flash
 from dotenv import load_dotenv
 
 
@@ -42,6 +42,7 @@ def index():
 def add_url():
 	url = request.form.get('url')
 	if not validators.url(url):
+		abort(422)
 		flash('Некорректный URL', 'alert alert-danger')
 		return redirect(url_for('index'))
 
@@ -76,7 +77,7 @@ def add_url():
 @app.route('/urls')
 def urls_list():
 	conn = connect_db()
-	cur = conn.cursor()
+	cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 	cur.execute("""
 	                SELECT urls.id,
 	                       urls.name,
