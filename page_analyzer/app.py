@@ -1,3 +1,4 @@
+import bs4
 import os
 import psycopg2
 import requests
@@ -18,6 +19,18 @@ DATABASE_URL = os.getenv('DATABASE_URL')
 
 def connect_db():
 	return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+
+
+def get_content_of_page(page_data):
+	soup = bs4.BeautifulSoup(page_data, 'html.parser')
+	h1_tag = soup.find('h1')
+	h1 = h1_tag.get_text(strip=True) if h1_tag else None
+	title_tag = soup.find('title')
+	title = title_tag.get_text(strip=True) if title_tag else None
+	meta_tag = soup.find('meta', attrs={'name': 'description'})
+	meta = meta_tag.get('content', '').strip() if meta_tag else None
+	return h1, title, meta
+
 
 
 @app.route('/')
@@ -96,7 +109,7 @@ def url_detail(id):
 		conn.close()
 		return redirect(url_for('urls_list'))
 	cur.execute("""
-	       SELECT id, status_code, created_at
+	       SELECT id, status_code, h1, title, description, created_at
 	       FROM url_checks
 	       WHERE url_id = %s
 	       ORDER BY id DESC
@@ -122,12 +135,18 @@ def url_checks(id):
 	row = cur.fetchone()
 	try:
 		response = requests.get(row['name'])
+		response.raise_for_status()
 	except Exception:
 		flash("Произошла ошибка при проверке", "alert alert-danger")
 		return redirect(url_for('url_detail', id=id))
+	h1, title, description = get_content_of_page(response.text)
 	cur.execute(
-		"INSERT INTO url_checks (url_id, status_code, created_at) VALUES (%s, %s, %s) RETURNING id;",
-		(id, response.status_code, datetime.now())
+		"""
+		INSERT INTO url_checks (url_id, status_code, h1, title, description, created_at) 
+		VALUES (%s, %s, %s, %s, %s, %s) 
+		RETURNING id;
+		""",
+		(id, response.status_code, h1, title, description, datetime.now())
 	)
 	conn.commit()
 	cur.close()
