@@ -8,9 +8,6 @@ from urllib.parse import urlparse
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash
 from dotenv import load_dotenv
-
-
-
 load_dotenv()
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
@@ -58,9 +55,10 @@ def add_url():
 			url_id = existing_url['id']
 			flash('Страница уже существует', 'alert alert-info')
 		else:
-			cur.execute("INSERT INTO urls (name, created_at) VALUES (%s, %s) RETURNING id",
-		                (normalized_url, datetime.utcnow())
-		                )
+			cur.execute(
+				"INSERT INTO urls (name, created_at) VALUES (%s, %s) RETURNING id",
+		        (normalized_url, datetime.utcnow())
+		    )
 			url_id = cur.fetchone()['id']
 			conn.commit()
 			flash('Страница успешно добавлена', 'alert alert-success')
@@ -77,20 +75,25 @@ def add_url():
 def urls_list():
 	conn = connect_db()
 	cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-	cur.execute("""
-	                SELECT urls.id,
-	                       urls.name,
-	                       url_checks.created_at AS last_check,
-	                       url_checks.status_code
-	                FROM urls
-	                LEFT JOIN (
-	                    SELECT DISTINCT ON (url_id) url_id, created_at, status_code
-	                    FROM url_checks
-	                    ORDER BY url_id, created_at DESC
-	                ) AS url_checks
-	                ON urls.id = url_checks.url_id
-	                ORDER BY urls.id DESC;
-	            """)
+	cur.execute(
+		"""
+	    SELECT urls.id,
+	        urls.name,
+	        url_checks.created_at AS last_check,
+	        url_checks.status_code
+	    FROM urls
+	    LEFT JOIN (
+	        SELECT DISTINCT ON (url_id)
+	            url_id,
+	            created_at,
+	            status_code
+	        FROM url_checks
+	        ORDER BY url_id, created_at DESC
+	    ) AS url_checks
+	    ON urls.id = url_checks.url_id
+	    ORDER BY urls.id DESC;
+	    """
+	)
 	urls = cur.fetchall()
 	cur.close()
 	conn.close()
@@ -108,12 +111,15 @@ def url_detail(id):
 		cur.close()
 		conn.close()
 		return redirect(url_for('urls_list'))
-	cur.execute("""
-	       SELECT id, status_code, h1, title, description, created_at
-	       FROM url_checks
-	       WHERE url_id = %s
-	       ORDER BY id DESC
-	   """, (id,))
+	cur.execute(
+		"""
+	    SELECT id, status_code, h1, title, description, created_at
+	    FROM url_checks
+	    WHERE url_id = %s
+	    ORDER BY id DESC
+		""",
+		(id,),
+	)
 	checks = cur.fetchall()
 	cur.close()
 	conn.close()
@@ -142,11 +148,24 @@ def url_checks(id):
 	h1, title, description = get_content_of_page(response.text)
 	cur.execute(
 		"""
-		INSERT INTO url_checks (url_id, status_code, h1, title, description, created_at) 
+		INSERT INTO url_checks (
+			url_id, 
+			status_code, 
+			h1, 
+			title, 
+			description, 
+			created_at
+		) 
 		VALUES (%s, %s, %s, %s, %s, %s) 
 		RETURNING id;
 		""",
-		(id, response.status_code, h1, title, description, datetime.now())
+		(
+			id,
+			response.status_code,
+			h1,
+			title,
+			description,
+			datetime.now())
 	)
 	conn.commit()
 	cur.close()
